@@ -1,12 +1,17 @@
 # Zero-Trust-Network
 
-## Overview
-A Rust implementation demonstrating Zero Trust Network Access (ZTNA) principles, evaluating access based on identity and continuous device health context rather than network location.
+![CI](https://github.com/skylerblue333/Zero-Trust-Network/workflows/CI/badge.svg)
 
-## Quick Start (1-Click Build)
+High-performance, memory-safe Rust service for network operations.
 
+## Features
+- Zero-cost abstractions using Actix-Web
+- Thread-safe Mutex state management
+- Dockerized minimal footprint deployment
+
+## Quick Start
 ```bash
-git clone https://github.com/skylerblue333/Zero-Trust-Network.git
-cd Zero-Trust-Network
+cargo test
 cargo run
+curl http://localhost:8080/health
 ```

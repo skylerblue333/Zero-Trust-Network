@@ -1,55 +1,45 @@
-use std::collections::HashMap;
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
-struct Identity {
-    id: String,
-    role: String,
-    device_health_score: u8,
+#[derive(Serialize, Deserialize, Clone)]
+struct ServiceState {
+    domain: String,
+    processed: usize,
 }
 
-struct ZeroTrustPolicyEngine {
-    resource_policies: HashMap<String, u8>,
+struct AppState {
+    state: Mutex<ServiceState>,
 }
 
-impl ZeroTrustPolicyEngine {
-    fn new() -> Self {
-        let mut policies = HashMap::new();
-        policies.insert("financial_records".to_string(), 90);
-        policies.insert("public_docs".to_string(), 10);
-        ZeroTrustPolicyEngine { resource_policies: policies }
-    }
-
-    fn evaluate_access(&self, identity: &Identity, resource: &str) -> bool {
-        println!("Evaluating access for {} to {}", identity.id, resource);
-        
-        if let Some(&required_score) = self.resource_policies.get(resource) {
-            if identity.device_health_score >= required_score {
-                println!("Access GRANTED: Device health {} >= {}", identity.device_health_score, required_score);
-                return true;
-            } else {
-                println!("Access DENIED: Device health {} < {}", identity.device_health_score, required_score);
-                return false;
-            }
-        }
-        println!("Access DENIED: Resource unknown");
-        false
-    }
+async fn health(data: web::Data<AppState>) -> impl Responder {
+    let state = data.state.lock().unwrap();
+    HttpResponse::Ok().json(serde_json::json!({"status": "ok", "domain": state.domain, "processed": state.processed}))
 }
 
-fn main() {
-    let engine = ZeroTrustPolicyEngine::new();
-    
-    let user1 = Identity {
-        id: "user_123".to_string(),
-        role: "employee".to_string(),
-        device_health_score: 95, // Fully patched, secure device
-    };
-    
-    let user2 = Identity {
-        id: "user_456".to_string(),
-        role: "contractor".to_string(),
-        device_health_score: 50, // Missing patches
-    };
-    
-    engine.evaluate_access(&user1, "financial_records");
-    engine.evaluate_access(&user2, "financial_records");
+async fn process(data: web::Data<AppState>) -> impl Responder {
+    let mut state = data.state.lock().unwrap();
+    state.processed += 1;
+    HttpResponse::Accepted().json(serde_json::json!({"status": "processing"}))
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let state = web::Data::new(AppState {
+        state: Mutex::new(ServiceState {
+            domain: "network".to_string(),
+            processed: 0,
+        }),
+    });
+
+    println!("Starting server on :8080");
+    HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .route("/health", web::get().to(health))
+            .route("/process", web::post().to(process))
+    })
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await
 }
